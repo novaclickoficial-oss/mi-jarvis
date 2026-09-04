@@ -785,20 +785,22 @@ def _tg_voice(token, chat_id, ogg_bytes):
 
 
 def _tg_maybe_voice(token, chat_id, reply):
-    """Si ElevenLabs está configurado y la respuesta no es muy larga, manda
-    también una nota de voz con la misma voz del mayordomo."""
+    """Intenta responder con una NOTA DE VOZ. Devuelve True si la envió.
+    Si no hay ElevenLabs, la respuesta es muy larga, o algo falla, devuelve
+    False (y quien llama manda texto como respaldo)."""
     try:
         cfg = load_config()
-        if not _el_key(cfg) or not (0 < len(reply) <= 700):
-            return
+        if not _el_key(cfg) or not (0 < len(reply) <= 1200):
+            return False
         mp3, _err = synthesize(cfg, reply)
         if not mp3:
-            return
+            return False
         ogg = _mp3_to_ogg(mp3)
         if ogg:
-            _tg_voice(token, chat_id, ogg)
+            return bool(_tg_voice(token, chat_id, ogg))
+        return False
     except Exception:
-        pass
+        return False
 
 
 def _telegram_loop():
@@ -841,8 +843,9 @@ def _telegram_loop():
                     reply = route_text(text) or "(sin respuesta)"
                 except Exception as e:
                     reply = "Ocurrió un error, señor: %s" % e
-                _tg(token, "sendMessage", {"chat_id": chat_id, "text": reply[:4000]})
-                _tg_maybe_voice(token, chat_id, reply)
+                # Solo audio: si logramos la nota de voz, NO mandamos texto.
+                if not _tg_maybe_voice(token, chat_id, reply):
+                    _tg(token, "sendMessage", {"chat_id": chat_id, "text": reply[:4000]})
         except Exception:
             time.sleep(3)
 
