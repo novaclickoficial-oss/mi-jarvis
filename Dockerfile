@@ -1,9 +1,9 @@
 # Imagen para desplegar Jarvis en la nube (EasyPanel / cualquier Docker).
 FROM python:3.12-slim
 
-# Chromium: necesario para imprimir facturas/recibos a PDF.
+# Chromium: imprime facturas/recibos a PDF. ffmpeg: convierte la voz a nota de voz de Telegram.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends chromium \
+    && apt-get install -y --no-install-recommends chromium ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -26,6 +26,8 @@ import datetime
 import base64
 import time
 import threading
+import tempfile
+import subprocess
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -736,6 +738,69 @@ def _tg(token, method, payload):
         return json.loads(r.read().decode("utf-8"))
 
 
+def _mp3_to_ogg(mp3_bytes):
+    """Convierte el MP3 de ElevenLabs a OGG/OPUS (lo que Telegram quiere para una
+    NOTA de voz). Necesita ffmpeg. Devuelve bytes o None si falla/no está."""
+    fd, mp3p = tempfile.mkstemp(suffix=".mp3")
+    os.close(fd)
+    oggp = mp3p[:-4] + ".ogg"
+    try:
+        with open(mp3p, "wb") as f:
+            f.write(mp3_bytes)
+        subprocess.run(["ffmpeg", "-y", "-i", mp3p, "-c:a", "libopus", "-b:a", "48k", oggp],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+        if os.path.exists(oggp) and os.path.getsize(oggp) > 0:
+            with open(oggp, "rb") as f:
+                return f.read()
+    except Exception:
+        pass
+    finally:
+        for p in (mp3p, oggp):
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+    return None
+
+
+def _tg_voice(token, chat_id, ogg_bytes):
+    """Envía una nota de voz (sendVoice, multipart)."""
+    boundary = "----jarvisvoice%d" % datetime.datetime.now().microsecond
+    parts = [
+        ("--%s\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n%s\r\n"
+         % (boundary, chat_id)).encode("utf-8"),
+        ("--%s\r\nContent-Disposition: form-data; name=\"voice\"; filename=\"jarvis.ogg\"\r\n"
+         "Content-Type: audio/ogg\r\n\r\n" % boundary).encode("utf-8"),
+        ogg_bytes,
+        ("\r\n--%s--\r\n" % boundary).encode("utf-8"),
+    ]
+    req = urllib.request.Request("https://api.telegram.org/bot%s/sendVoice" % token,
+        data=b"".join(parts), method="POST",
+        headers={"content-type": "multipart/form-data; boundary=%s" % boundary})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.loads(r.read().decode("utf-8")).get("ok", False)
+    except Exception:
+        return False
+
+
+def _tg_maybe_voice(token, chat_id, reply):
+    """Si ElevenLabs está configurado y la respuesta no es muy larga, manda
+    también una nota de voz con la misma voz del mayordomo."""
+    try:
+        cfg = load_config()
+        if not _el_key(cfg) or not (0 < len(reply) <= 700):
+            return
+        mp3, _err = synthesize(cfg, reply)
+        if not mp3:
+            return
+        ogg = _mp3_to_ogg(mp3)
+        if ogg:
+            _tg_voice(token, chat_id, ogg)
+    except Exception:
+        pass
+
+
 def _telegram_loop():
     token = str(load_config().get("telegram_bot_token", "")).strip()
     if not token:
@@ -777,6 +842,7 @@ def _telegram_loop():
                 except Exception as e:
                     reply = "Ocurrió un error, señor: %s" % e
                 _tg(token, "sendMessage", {"chat_id": chat_id, "text": reply[:4000]})
+                _tg_maybe_voice(token, chat_id, reply)
         except Exception:
             time.sleep(3)
 
