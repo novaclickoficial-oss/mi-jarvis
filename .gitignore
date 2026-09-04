@@ -1,0 +1,8 @@
+# Secretos y estado local: NUNCA subir al repo.
+config.json
+reminders.json
+index.json
+deals/
+notes/captures/
+__pycache__/
+*.pyc

@@ -1,0 +1,2 @@
+# Solo se usa para el poder de "leer un archivo" (PDF). El resto es stdlib.
+pypdf>=4.0.0

@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jarvis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #05060f;
+    --text: #e9edf7;
+    --muted: #8b95b6;
+    --glass: rgba(14,17,32,0.72);
+    --glass-strong: rgba(14,17,32,0.9);
+    --border: rgba(130,150,225,0.20);
+    --accent1: #6ea8ff;
+    --accent2: #8f7bff;
+    --green: #38e0a0;
+    --amber: #ffb86b;
+    --blue: #6ea8ff;
+    --font: 'Inter', -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  #space {
+    position: fixed; inset: 0; z-index: 0;
+    background:
+      radial-gradient(1200px 800px at 72% 18%, rgba(46,66,130,0.28), transparent 60%),
+      radial-gradient(900px 700px at 18% 82%, rgba(96,52,140,0.22), transparent 60%),
+      #04050c;
+  }
+  #stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  #graph { position: fixed; inset: 0; z-index: 1; }
+
+  /* ---------- Barra superior ---------- */
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 4;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; pointer-events: none;
+  }
+  .brand { display: flex; flex-direction: column; gap: 2px; text-shadow: 0 1px 10px rgba(0,0,0,.7); }
+  .brand .name {
+    font-size: 15px; font-weight: 700; letter-spacing: 3px;
+    background: linear-gradient(90deg, var(--accent1), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .brand .count { font-size: 11.5px; color: var(--muted); letter-spacing: .2px; }
+  .chips { display: flex; gap: 8px; align-items: center; pointer-events: auto; }
+  .chip {
+    font-size: 12px; font-weight: 500; padding: 6px 12px; border-radius: 999px;
+    background: var(--glass); border: 1px solid var(--border); color: #cdd6f4;
+    white-space: nowrap; backdrop-filter: blur(10px);
+  }
+  #shareChip { display: none; background: rgba(255,90,90,0.16);
+    border-color: rgba(255,120,120,0.45); color: #ffd3d3; }
+  #shareChip .dot { color: #ff5a5a; animation: blink 1.1s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+
+  /* ---------- Panel lateral ---------- */
+  #panel {
+    position: fixed; top: 0; right: 0; z-index: 6;
+    width: min(400px, 84vw); height: 100%;
+    background: var(--glass-strong); backdrop-filter: blur(14px);
+    border-left: 1px solid var(--border);
+    transform: translateX(105%); transition: transform .4s cubic-bezier(.2,.8,.2,1);
+    padding: 30px 26px; overflow-y: auto;
+  }
+  #panel.open { transform: translateX(0); }
+  #panel .group {
+    display: inline-block; font-size: 10.5px; letter-spacing: .8px; font-weight: 600;
+    text-transform: uppercase; padding: 4px 10px; border-radius: 999px;
+    background: rgba(130,150,225,0.16); color: #c7d0ee; margin-bottom: 14px;
+  }
+  #panel h2 { margin: 0 0 16px; font-size: 21px; font-weight: 600; line-height: 1.25; }
+  #panel p { margin: 0; font-size: 14px; line-height: 1.7; color: #c3cbe0; }
+  #panel .close {
+    position: absolute; top: 16px; right: 18px; cursor: pointer;
+    border: none; background: transparent; color: var(--muted); font-size: 24px; line-height: 1;
+  }
+
+  /* ---------- Consola inferior (voz primero) ---------- */
+  #console {
+    position: fixed; left: 50%; bottom: 26px; z-index: 5;
+    transform: translateX(-50%); width: min(560px, 92vw);
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+  }
+  #answer {
+    width: 100%; max-height: 32vh; overflow-y: auto;
+    padding: 16px 18px; border-radius: 16px;
+    background: var(--glass); border: 1px solid var(--border);
+    backdrop-filter: blur(12px); box-shadow: 0 16px 50px rgba(0,0,0,.4);
+    font-size: 15px; line-height: 1.6; color: #f0f3fc;
+    opacity: 0; transform: translateY(8px); transition: opacity .3s, transform .3s;
+  }
+  #answer.show { opacity: 1; transform: translateY(0); }
+  #answer .who {
+    font-size: 10.5px; letter-spacing: .6px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 7px; font-weight: 600;
+  }
+
+  #controls { display: flex; align-items: center; gap: 20px; }
+  .ctl {
+    width: 46px; height: 46px; border-radius: 50%; cursor: pointer; flex: none;
+    border: 1px solid var(--border); background: var(--glass); color: #cdd6f4;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(10px); transition: all .2s;
+  }
+  .ctl:hover { border-color: rgba(130,150,225,0.5); color: #fff; }
+  .ctl.active { background: #ff5a5a; border-color: #ff5a5a; color: #10121f; }
+
+  /* Orbe del microfono (control principal) */
+  #mic {
+    position: relative; width: 74px; height: 74px; border-radius: 50%; cursor: pointer; flex: none;
+    border: none; color: #071021;
+    background: radial-gradient(circle at 35% 30%, #9dc0ff, var(--accent1) 45%, var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 34px rgba(110,168,255,.45); transition: transform .15s;
+  }
+  #mic:hover { transform: scale(1.04); }
+  #mic:active { transform: scale(.97); }
+  #mic::after {  /* anillo de estado */
+    content: ""; position: absolute; inset: -10px; border-radius: 50%;
+    border: 2px solid transparent; pointer-events: none;
+  }
+  #mic[data-state="listening"] { background: radial-gradient(circle at 35% 30%, #b6f4d8, var(--green) 55%, #16b981); }
+  #mic[data-state="listening"]::after { border-color: rgba(56,224,160,.6); animation: ring-pulse 1.5s ease-out infinite; }
+  #mic[data-state="thinking"]::after { border-top-color: var(--amber); border-right-color: var(--amber); animation: ring-spin .9s linear infinite; }
+  #mic[data-state="speaking"] { background: radial-gradient(circle at 35% 30%, #bcd6ff, var(--blue) 55%, var(--accent2)); }
+  #mic[data-state="speaking"]::after { border-color: rgba(110,168,255,.55); animation: ring-pulse 1s ease-out infinite; }
+  @keyframes ring-pulse { 0% { transform: scale(.9); opacity: .9; } 100% { transform: scale(1.25); opacity: 0; } }
+  @keyframes ring-spin { to { transform: rotate(360deg); } }
+
+  #status {
+    display: none; align-items: center; gap: 9px; max-width: 92vw;
+    font-size: 13px; color: #cdd6f4; letter-spacing: .2px;
+  }
+  #status.show { display: flex; }
+  #status .d { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  #status[data-state="listening"] .d { background: var(--green); box-shadow: 0 0 10px var(--green); }
+  #status[data-state="thinking"] .d { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+  #status[data-state="speaking"] .d { background: var(--blue); box-shadow: 0 0 10px var(--blue); }
+  #statusText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Entrada de texto (secundaria, se muestra con el teclado) */
+  #bar {
+    display: none; width: 100%; gap: 8px; align-items: center;
+    background: var(--glass); border: 1px solid var(--border); border-radius: 14px;
+    padding: 6px 6px 6px 16px; backdrop-filter: blur(12px);
+  }
+  #bar.show { display: flex; }
+  #q { flex: 1; border: none; outline: none; background: transparent; color: #fff;
+    font-size: 15px; font-family: var(--font); padding: 9px 0; }
+  #q::placeholder { color: #6f7896; }
+  #send { border: none; cursor: pointer; border-radius: 10px; font-family: var(--font);
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    color: #08101f; font-weight: 600; font-size: 14px; padding: 10px 16px; flex: none; }
+
+  svg { display: block; }
+</style>
+</head>
+<body>
+  <div id="space"></div>
+  <canvas id="stars"></canvas>
+  <div id="graph"></div>
+  <video id="shareVideo" playsinline muted style="display:none"></video>
+
+  <div id="topbar">
+    <div class="brand">
+      <span class="name">JARVIS</span>
+      <span class="count" id="count">Cargando notas…</span>
+    </div>
+    <div class="chips">
+      <div class="chip" id="shareChip"><span class="dot">●</span> Viendo tu pantalla</div>
+      <div class="chip" id="fileChip" style="display:none; cursor:pointer;"></div>
+      <div class="chip" id="brainChip">Cerebro: …</div>
+    </div>
+  </div>
+
+  <aside id="panel">
+    <button class="close" id="panelClose" aria-label="Cerrar">&times;</button>
+    <span class="group" id="panelGroup"></span>
+    <h2 id="panelTitle"></h2>
+    <p id="panelBody"></p>
+  </aside>
+
+  <div id="console">
+    <div id="answer"><div class="who">Jarvis</div><div id="answerBody"></div></div>
+    <div id="controls">
+      <button id="screen" class="ctl" type="button" title="Compartir pantalla" aria-label="Compartir pantalla">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      </button>
+      <button id="attach" class="ctl" type="button" title="Adjuntar archivo" aria-label="Adjuntar archivo">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8-8a3.3 3.3 0 0 1 4.7 4.7l-8 8a1.7 1.7 0 0 1-2.4-2.4l7.3-7.3"/></svg>
+      </button>
+      <button id="mic" type="button" title="Hablar" aria-label="Hablar" data-state="idle">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/></svg>
+      </button>
+      <button id="type" class="ctl" type="button" title="Escribir" aria-label="Escribir">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
+      </button>
+    </div>
+    <input type="file" id="fileInput" accept=".txt,.md,.csv,.pdf,.log,.json" hidden>
+    <div id="status"><span class="d"></span><span id="statusText"></span></div>
+    <form id="bar" autocomplete="off">
+      <input id="q" placeholder="Escríbele a tus notas…" />
+      <button id="send" type="submit">Enviar</button>
+    </form>
+  </div>
+
+  <script src="graph-data.js"></script>
+  <script src="https://unpkg.com/3d-force-graph"></script>
+  <script>
+  (function () {
+    // ================== CONSTANTES QUE VALE LA PENA TOCAR ==================
+    const FINISH_MS = 1500;  // ms de SILENCIO tras dejar de hablar antes de enviar (súbelo si te corta)
+    const INTERRUPT_WORDS = ['para', 'alto', 'stop', 'espera', 'wait', 'silencio', 'callate', 'cállate'];
+    const REMEMBER_TRIGGERS = ['recuerda que', 'anota que', 'anota', 'apunta que',
+      'apunta', 'nota para mí', 'nota para mi', 'no me dejes olvidar'];
+    const REMINDER_TRIGGERS = ['recuérdame', 'recuerdame', 'avísame', 'avisame',
+      'recordatorio', 'ponme un recordatorio'];
+    // ======================================================================
+
+    // ---------- Campo de estrellas ----------
+    const starCanvas = document.getElementById('stars');
+    const sctx = starCanvas.getContext('2d');
+    let stars = [];
+    function seedStars() {
+      starCanvas.width = innerWidth; starCanvas.height = innerHeight;
+      const n = Math.floor((innerWidth * innerHeight) / 5200);
+      stars = Array.from({ length: n }, () => ({
+        x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+        r: Math.random() * 1.3 + 0.2, a: Math.random() * 0.6 + 0.2,
+        tw: Math.random() * 0.02 + 0.004, p: Math.random() * Math.PI * 2,
+      }));
+    }
+    function drawStars() {
+      sctx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+      for (const s of stars) {
+        s.p += s.tw; const a = s.a * (0.6 + 0.4 * Math.sin(s.p));
+        sctx.beginPath(); sctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        sctx.fillStyle = 'rgba(220,230,255,' + a.toFixed(3) + ')'; sctx.fill();
+      }
+      requestAnimationFrame(drawStars);
+    }
+    seedStars(); drawStars(); addEventListener('resize', seedStars);
+
+    // ---------- Colores por grupo ----------
+    const PALETTE = ['#6ea8ff', '#7ce0c6', '#ffb86b', '#ff7b9c', '#b58cff',
+                     '#f4d35e', '#5ad1e8', '#9ef07a', '#ff9e64'];
+    const groups = [...new Set(GRAPH.nodes.map(n => n.group))].sort();
+    const colorOf = {};
+    groups.forEach((g, i) => { colorOf[g] = PALETTE[i % PALETTE.length]; });
+    const groupColor = g => colorOf[g] || '#8fa4ff';
+
+    // ---------- Adyacencia ----------
+    const neighbours = new Map(GRAPH.nodes.map(n => [n.id, new Set()]));
+    for (const l of GRAPH.links) { neighbours.get(l.source).add(l.target); neighbours.get(l.target).add(l.source); }
+
+    // ---------- Resaltado ----------
+    let hiNodes = new Set(), hiLinks = new Set();
+    const idOf = e => (typeof e === 'object' ? e.id : e);
+    const linkId = l => idOf(l.source) + '-' + idOf(l.target);
+    const active = () => hiNodes.size > 0;
+    function dim(hex, f) {
+      const h = hex.replace('#', '');
+      const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+      return 'rgb(' + Math.round(r*f) + ',' + Math.round(g*f) + ',' + Math.round(b*f) + ')';
+    }
+
+    // ---------- La galaxia ----------
+    const Graph = ForceGraph3D()(document.getElementById('graph'))
+      .backgroundColor('rgba(4,5,12,0)')
+      .graphData(GRAPH)
+      .nodeLabel(n => n.label)
+      .nodeRelSize(5).nodeResolution(18).nodeOpacity(0.95)
+      .nodeColor(n => active() ? (hiNodes.has(n.id) ? groupColor(n.group) : dim(groupColor(n.group), 0.22))
+                                : groupColor(n.group))
+      .linkColor(l => hiLinks.has(linkId(l)) ? '#cdd7ff' : 'rgba(150,165,220,0.18)')
+      .linkWidth(l => hiLinks.has(linkId(l)) ? 1.6 : 0.4)
+      .linkOpacity(0.5)
+      .onNodeClick(focusNode)
+      .onBackgroundClick(clearSelection);
+
+    Graph.width(innerWidth).height(innerHeight);
+    addEventListener('resize', () => Graph.width(innerWidth).height(innerHeight));
+    Graph.controls().autoRotate = true;
+    Graph.controls().autoRotateSpeed = 0.35;
+    Graph.controls().enableDamping = true;
+
+    document.getElementById('count').textContent =
+      GRAPH.nodes.length + ' notas · ' + GRAPH.links.length + ' enlaces';
+
+    function refreshColors() {
+      Graph.nodeColor(Graph.nodeColor()).linkColor(Graph.linkColor()).linkWidth(Graph.linkWidth());
+    }
+    function setHighlight(ids) {
+      hiNodes = new Set(ids); hiLinks = new Set();
+      for (const l of Graph.graphData().links)
+        if (hiNodes.has(idOf(l.source)) && hiNodes.has(idOf(l.target))) hiLinks.add(linkId(l));
+      refreshColors();
+    }
+    function flyTo(node, ms) {
+      const r = 1 + 90 / Math.hypot(node.x || 1, node.y || 1, node.z || 1);
+      Graph.cameraPosition({ x: (node.x||0)*r, y: (node.y||0)*r, z: (node.z||0)*r }, node, ms || 1400);
+    }
+    function nodeById(id) { return Graph.graphData().nodes.find(n => n.id === id); }
+    function focusNode(node) {
+      Graph.controls().autoRotate = false;
+      setHighlight([node.id, ...(neighbours.get(node.id) || [])]);
+      flyTo(node); openPanel(node);
+    }
+    function clearSelection() {
+      hiNodes = new Set(); hiLinks = new Set(); refreshColors();
+      closePanel(); Graph.controls().autoRotate = true;
+    }
+
+    // ---------- Panel lateral ----------
+    const panel = document.getElementById('panel');
+    function openPanel(node) {
+      document.getElementById('panelGroup').textContent = node.group;
+      document.getElementById('panelTitle').textContent = node.label;
+      document.getElementById('panelBody').textContent = node.excerpt || '';
+      panel.classList.add('open');
+    }
+    function closePanel() { panel.classList.remove('open'); }
+    document.getElementById('panelClose').onclick = clearSelection;
+
+    // ---------- Prompt 03: la galaxia prueba de donde salio la respuesta ----------
+    function highlightFromAnswer(nodes) {
+      if (!Array.isArray(nodes) || nodes.length === 0) return;
+      if (nodes.length >= 4) { Graph.controls().autoRotate = false; setHighlight(nodes); return; }
+      const top = nodeById(nodes[0]); if (!top) return;
+      Graph.controls().autoRotate = false;
+      const lit = new Set(nodes);
+      for (const id of nodes) for (const nb of (neighbours.get(id) || [])) lit.add(nb);
+      setHighlight([...lit]); flyTo(top); openPanel(top);
+    }
+
+    // ---------- Elementos de la consola ----------
+    const form = document.getElementById('bar');
+    const input = document.getElementById('q');
+    const answer = document.getElementById('answer');
+    const answerBody = document.getElementById('answerBody');
+    const statusEl = document.getElementById('status');
+    const statusText = document.getElementById('statusText');
+    const micBtn = document.getElementById('mic');
+    function showAnswer(text) { answerBody.textContent = text; answer.classList.add('show'); }
+
+    const LABELS = { idle: '', listening: 'Escuchando…', thinking: 'Pensando…', speaking: 'Hablando…' };
+    function setMode(state, text) {
+      micBtn.dataset.state = state;
+      statusEl.dataset.state = state;
+      statusText.textContent = (text !== undefined) ? text : (LABELS[state] || '');
+      statusEl.classList.toggle('show', state !== 'idle' || !!text);
+    }
+
+    // ================== VOZ ==================
+    let preferredVoice = null;
+    function pickVoice() {
+      const vs = speechSynthesis.getVoices();
+      preferredVoice = vs.find(v => /es[-_]/i.test(v.lang)) || vs.find(v => /en[-_]GB/i.test(v.lang)) || vs[0] || null;
+    }
+    if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+    let voiceEnabled = false;
+    let currentAudio = null;
+    let speakSeq = 0;              // cada turno de voz tiene un numero; el viejo se descarta
+    let assistantBusy = false;    // mientras piensa o habla, el microfono se IGNORA
+    let micOn = false;
+    let micSuspended = false;     // micrófono APAGADO mientras Jarvis habla
+    let lastSpokenNorm = '';      // lo último que dijo Jarvis (para no oírse a sí mismo)
+    let ignoreUntil = 0;          // ignora el micro hasta este instante (cola/eco tras hablar)
+    const norm = (s) => (s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+    function isEcho(phrase) {      // ¿esto que "oí" es en realidad la propia voz de Jarvis?
+      const p = norm(phrase);
+      if (!p || !lastSpokenNorm) return false;
+      if (lastSpokenNorm.includes(p)) return true;
+      const words = p.split(' ').filter(w => w.length > 2);
+      if (!words.length) return false;
+      let hit = 0; for (const w of words) if (lastSpokenNorm.includes(w)) hit++;
+      return hit / words.length >= 0.6;   // >60% de las palabras coinciden con lo dicho
+    }
+
+    function suspendMic() {        // apaga el micro mientras Jarvis habla
+      if (!recog || !micOn) return;
+      micSuspended = true; clearTimeout(finishTimer);
+      try { recog.stop(); } catch (e) {}
+    }
+    function resumeMic() {         // vuelve a escuchar cuando Jarvis termina
+      if (!recog || !micOn) return;
+      ignoreUntil = Date.now() + 1200;   // descarta el eco/cola de la voz recién dicha
+      buffer = ''; pendingInterim = ''; clearTimeout(finishTimer);
+      setTimeout(() => {           // pequeña espera para no captar el eco final
+        micSuspended = false;
+        try { recog.start(); } catch (e) {}
+        if (micOn && !assistantBusy) setMode('listening');
+      }, 350);
+    }
+    function stopSpeaking() {      // corta cualquier voz en curso (NO toca speakSeq)
+      if ('speechSynthesis' in window) speechSynthesis.cancel();
+      if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
+    }
+    function speakBrowser(text, done, turn) {   // respaldo: voz del navegador
+      if (!('speechSynthesis' in window)) { done(); return; }
+      const u = new SpeechSynthesisUtterance(text);
+      if (preferredVoice) { u.voice = preferredVoice; u.lang = preferredVoice.lang; }
+      u.rate = 1.02;
+      u.onend = () => { if (turn === speakSeq) done(); };
+      speechSynthesis.speak(u);
+    }
+    async function speak(text, onDone) {
+      const done = () => { resumeMic(); if (onDone) onDone(); };
+      if (!voiceEnabled || !text) { done(); return; }
+      const turn = ++speakSeq;      // este es el turno vigente
+      lastSpokenNorm = norm(text);  // recuerda lo que dirá, para filtrar su propio eco
+      stopSpeaking();
+      suspendMic();                 // APAGA el micrófono mientras habla
+      setMode('speaking');
+      try {
+        const res = await fetch('/speak', { method: 'POST',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+        if (turn !== speakSeq) return;                 // llegó un turno más nuevo -> abortar
+        if (res.ok) {
+          const blob = await res.blob();
+          if (turn !== speakSeq) return;
+          if (blob && blob.size > 0) {
+            const url = URL.createObjectURL(blob);
+            currentAudio = new Audio(url);
+            currentAudio.onended = () => {
+              URL.revokeObjectURL(url); currentAudio = null;
+              if (turn === speakSeq) done();
+            };
+            await currentAudio.play();
+            return;
+          }
+        }
+        speakBrowser(text, done, turn);                // 204/error -> voz del navegador
+      } catch (e) {
+        if (turn === speakSeq) speakBrowser(text, done, turn);
+      }
+    }
+
+    // ---------- Reconocimiento de voz (prompt 02) ----------
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recog = null, buffer = '', pendingInterim = '', finishTimer = null;
+    function fireBuffer() {
+      let phrase = buffer.trim();
+      if (!phrase) phrase = pendingInterim.trim();   // por si el navegador aún no finalizó
+      buffer = ''; pendingInterim = '';
+      if (phrase) ask(phrase);
+    }
+    if (SR) {
+      recog = new SR(); recog.lang = 'es-US'; recog.continuous = true; recog.interimResults = true;
+      recog.onresult = (e) => {
+        if (assistantBusy || Date.now() < ignoreUntil) return;   // no te escuches a ti mismo
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i];
+          if (res.isFinal) {
+            const txt = res[0].transcript.trim();
+            if (isEcho(txt)) continue;       // era el eco de la propia voz de Jarvis
+            if (INTERRUPT_WORDS.includes(txt.toLowerCase())) {
+              stopSpeaking(); clearTimeout(finishTimer); buffer = ''; pendingInterim = ''; setMode('listening'); return;
+            }
+            buffer += (buffer ? ' ' : '') + txt;
+          } else { interim += res[0].transcript + ' '; }
+        }
+        pendingInterim = interim.trim();
+        // Mientras haya voz (interina O final) reiniciamos el contador de silencio:
+        // solo enviamos tras una pausa REAL, para no cortarte a mitad de frase.
+        clearTimeout(finishTimer);
+        finishTimer = setTimeout(fireBuffer, FINISH_MS);
+        if (micOn && !assistantBusy) {
+          const shown = (buffer + ' ' + pendingInterim).trim();
+          setMode('listening', shown ? '“' + shown + '”' : undefined);
+        }
+      };
+      recog.onerror = (e) => {
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          micOn = false; micBtn.classList.remove('active');
+          setMode('idle', 'Micrófono no disponible (permite el acceso en el navegador)');
+        }
+      };
+      recog.onend = () => { if (micOn && !micSuspended) { try { recog.start(); } catch (e) {} } };  // sigue viva salvo mientras Jarvis habla
+    }
+    function startListening() {
+      if (!recog) return;
+      micOn = true; micSuspended = false; buffer = ''; micBtn.classList.remove('active');
+      try { recog.start(); } catch (e) {}
+      if (!assistantBusy) setMode('listening');
+    }
+    function stopListening() {
+      micOn = false; clearTimeout(finishTimer);
+      if (recog) { try { recog.stop(); } catch (e) {} }
+      setMode('idle');
+    }
+    micBtn.addEventListener('click', () => {
+      if (!recog) { setMode('idle', 'Tu navegador no soporta el micrófono'); return; }
+      if (micOn && !assistantBusy) { stopListening(); }
+      else { stopSpeaking(); assistantBusy = false; startListening(); }
+    });
+
+    // ---------- Saludo + voz-primero (empieza escuchando) ----------
+    const count = GRAPH.nodes.length;
+    const h = new Date().getHours();
+    const tod = h < 12 ? 'Buenos días' : (h < 19 ? 'Buenas tardes' : 'Buenas noches');
+    const greeting = tod + ', señor. ' + count + ' notas indexadas, todas presentes y en orden.';
+    showAnswer(greeting);
+    setMode('idle', 'Toca en cualquier lugar para empezar');
+
+    function enableVoiceOnce() {
+      if (voiceEnabled) return;
+      voiceEnabled = true;
+      removeEventListener('pointerdown', enableVoiceOnce);
+      removeEventListener('keydown', enableVoiceOnce);
+      // Saluda PRIMERO (con el micrófono apagado) y SOLO al terminar se pone a escuchar.
+      setMode('speaking');
+      speak(greeting, () => { startListening(); });
+    }
+    addEventListener('pointerdown', enableVoiceOnce);
+    addEventListener('keydown', enableVoiceOnce);
+
+    // ================== OJOS (prompt 06) ==================
+    const screenBtn = document.getElementById('screen');
+    const shareChip = document.getElementById('shareChip');
+    const shareVideo = document.getElementById('shareVideo');
+    let shareStream = null;
+    function sharing() { return !!(shareStream && shareStream.getVideoTracks()[0] &&
+      shareStream.getVideoTracks()[0].readyState === 'live'); }
+    async function startShare() {
+      try {
+        shareStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        shareVideo.srcObject = shareStream; await shareVideo.play();
+        screenBtn.classList.add('active'); shareChip.style.display = 'inline-flex';
+        shareStream.getVideoTracks()[0].onended = () => stopShare(true);
+      } catch (err) { showAnswer('No pude iniciar la compartición: ' + err.message); }
+    }
+    function stopShare(announce) {
+      if (shareStream) shareStream.getTracks().forEach(t => t.stop());
+      shareStream = null; screenBtn.classList.remove('active'); shareChip.style.display = 'none';
+      if (announce === true) speak('El recurso compartido terminó, señor.');
+    }
+    screenBtn.addEventListener('click', () => sharing() ? stopShare() : startShare());
+    function captureFrame() {
+      if (!sharing() || !shareVideo.videoWidth) return null;
+      const c = document.createElement('canvas');
+      c.width = shareVideo.videoWidth; c.height = shareVideo.videoHeight;
+      c.getContext('2d').drawImage(shareVideo, 0, 0, c.width, c.height);
+      return c.toDataURL('image/jpeg', 0.7).split(',')[1];
+    }
+
+    // ================== Enrutado de un turno ==================
+    async function post(url, body) {
+      const res = await fetch(url, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      return res.json();
+    }
+    function matchTrigger(text) {
+      const low = text.toLowerCase();
+      for (const t of REMEMBER_TRIGGERS)
+        if (low.startsWith(t)) return text.slice(t.length).replace(/^[\s,:.]+/, '').trim();
+      return null;
+    }
+    function isModelCommand(text) {
+      return /\b(cambia|cámbiate|cambiate|cambiar|usa|ponte|switch|prueba|vuelve|regresa)\b/i.test(text)
+          && /\b(fable|opus|sonnet|haiku|cerebro|normal)\b/i.test(text);
+    }
+    function isInvoiceCommand(text) {   // factura/recibo/cotización/propuesta con un monto
+      return /(factura|factúr|recibo|cotiz|cotíz|propuesta)/i.test(text) && /\d/.test(text);
+    }
+    function matchReminder(text) {      // "recuérdame [algo] [cuándo]"
+      const low = text.toLowerCase();
+      for (const t of REMINDER_TRIGGERS)
+        if (low.startsWith(t)) return text.slice(t.length).replace(/^[\s,:.]+/, '').trim() || text;
+      return null;
+    }
+    function isSummaryCommand(text) {   // "resume/analiza mis notas de X"
+      return /\b(resume|resúmeme|resumeme|resumen|analiza|analízame|analizame)\b/i.test(text);
+    }
+    function isComposeCommand(text) {   // "redáctame un correo…"
+      return /\b(redacta|redáctame|redactame|redáctale|redactale|escríbeme|escribeme|redactar)\b/i.test(text);
+    }
+    function isTranslateCommand(text) { // "traduce al inglés…"
+      return /\b(traduce|tradúceme|traduceme|tradúcelo|traducelo|traducir|traducción|traduccion)\b/i.test(text);
+    }
+    function finishTurn() { assistantBusy = false; setMode(micOn ? 'listening' : 'idle'); }
+
+    async function ask(text) {
+      text = (text || '').trim(); if (!text) return;
+      stopSpeaking();
+      assistantBusy = true;               // turno del asistente: el micrófono se ignora
+      const toRemind = matchReminder(text);
+      if (toRemind) return doReminder(toRemind);
+      const toRemember = matchTrigger(text);
+      if (toRemember) return doRemember(toRemember);
+      if (isModelCommand(text)) return doModel(text);
+      if (isInvoiceCommand(text)) return doInvoice(text);
+      if (isComposeCommand(text)) return doCompose(text);
+      if (isTranslateCommand(text)) return doTranslate(text);
+      if (isSummaryCommand(text)) return doSummary(text);
+      setMode('thinking'); showAnswer('Pensando…');
+      try {
+        if (sharing()) {                                    // prompt 06
+          const image = captureFrame();
+          if (!image) { stopShare(false);
+            showAnswer('El recurso compartido terminó — no respondo de memoria.');
+            speak('El recurso compartido terminó, señor.', finishTurn); return; }
+          const data = await post('/see', { question: text, image });
+          showAnswer(data.answer || '(sin respuesta)'); speak(data.answer, finishTurn);
+        } else {                                            // prompt 01/03
+          const data = await post('/chat', { question: text });
+          showAnswer(data.answer || '(sin respuesta)');
+          highlightFromAnswer(data.nodes);
+          speak(data.answer, finishTurn);
+        }
+      } catch (err) {
+        showAnswer('No pude contactar al servidor: ' + err.message); finishTurn();
+      }
+    }
+
+    // ---------- Prompt 05: recuerda que ----------
+    async function doRemember(textToSave) {
+      setMode('thinking'); showAnswer('Guardando: “' + textToSave + '”');
+      try {
+        const data = await post('/remember', { text: textToSave });
+        if (!data.ok) { showAnswer(data.message); speak(data.message, finishTurn); return; }
+        const gd = Graph.graphData();
+        const anchor = gd.nodes.find(n => n.id === data.anchor);
+        const newNode = { id: data.node.id, label: data.node.label, group: data.node.group, excerpt: data.node.excerpt };
+        if (anchor) { newNode.x = anchor.x; newNode.y = anchor.y; newNode.z = anchor.z; }
+        gd.nodes.push(newNode);
+        neighbours.set(newNode.id, new Set());
+        (data.links || []).forEach(l => {
+          gd.links.push({ source: l.source, target: l.target });
+          neighbours.get(l.source) && neighbours.get(l.source).add(l.target);
+          neighbours.get(l.target) && neighbours.get(l.target).add(l.source);
+        });
+        Graph.graphData(gd);
+        document.getElementById('count').textContent = gd.nodes.length + ' notas · ' + gd.links.length + ' enlaces';
+        setTimeout(() => { const born = nodeById(newNode.id);
+          if (born) { setHighlight([newNode.id, ...(neighbours.get(newNode.id) || [])]); flyTo(born, 1200); openPanel(born); } }, 120);
+        showAnswer(data.message); speak(data.message, finishTurn);
+      } catch (err) {
+        const m = 'No pude guardar la captura, señor: ' + err.message;
+        showAnswer(m); speak(m, finishTurn);
+      }
+    }
+
+    // ---------- Prompt 08: cambio de cerebro ----------
+    const brainChip = document.getElementById('brainChip');
+    function setChip(label) { brainChip.textContent = 'Cerebro: ' + label; }
+    fetch('/model').then(r => r.json()).then(s => setChip(s.label)).catch(() => setChip('—'));
+    async function doModel(text) {
+      setMode('thinking');
+      try {
+        const data = await post('/model', { spoken: text });
+        if (!data.ok) { showAnswer(data.message); speak(data.message, finishTurn); return; }
+        setChip(data.label); showAnswer(data.line); speak(data.line, finishTurn);
+      } catch (err) { showAnswer('No pude cambiar de cerebro: ' + err.message); finishTurn(); }
+    }
+
+    // ---------- Motor de facturas / cotizaciones / propuestas ----------
+    async function doInvoice(text) {
+      setMode('thinking'); showAnswer('Preparando el documento…');
+      try {
+        const data = await post('/invoice', { brief: text });
+        const msg = data.message || (data.ok ? 'Listo, señor.' : 'No pude generarlo, señor.');
+        showAnswer(msg); speak(msg, finishTurn);
+      } catch (err) { showAnswer('No pude generar el documento: ' + err.message); finishTurn(); }
+    }
+
+    // ---------- Recordatorios (poder local, sin cuentas externas) ----------
+    let reminders = [];
+    async function loadReminders() {
+      try { const d = await post('/reminders', { action: 'list' }); reminders = d.reminders || []; } catch (e) {}
+    }
+    loadReminders();
+    function checkReminders() {
+      const now = Date.now();
+      for (const r of reminders) {
+        if (r.done || r.fired || !r.due) continue;
+        if (new Date(r.due).getTime() <= now) {
+          r.fired = true;
+          const msg = 'Recordatorio, señor: ' + r.text;
+          showAnswer(msg); speak(msg);
+          if ('Notification' in window && Notification.permission === 'granted')
+            try { new Notification('Jarvis', { body: r.text }); } catch (e) {}
+          post('/reminders', { action: 'done', id: r.id });
+        }
+      }
+    }
+    setInterval(checkReminders, 15000);
+    async function doReminder(text) {
+      setMode('thinking');
+      if ('Notification' in window && Notification.permission === 'default')
+        try { Notification.requestPermission(); } catch (e) {}
+      try {
+        const d = await post('/reminders', { action: 'add', text });
+        if (d.ok && d.reminder) reminders.push(d.reminder);
+        const m = d.message || 'Anotado, señor.'; showAnswer(m); speak(m, finishTurn);
+      } catch (err) { showAnswer('No pude guardar el recordatorio: ' + err.message); finishTurn(); }
+    }
+
+    // ---------- Resumen / análisis de notas (poder local) ----------
+    async function doSummary(topic) {
+      setMode('thinking'); showAnswer('Resumiendo…');
+      try {
+        const d = await post('/summary', { topic });
+        showAnswer(d.answer || '(sin respuesta)'); highlightFromAnswer(d.nodes); speak(d.answer, finishTurn);
+      } catch (err) { showAnswer('No pude resumir: ' + err.message); finishTurn(); }
+    }
+
+    // ---------- Redactar y traducir (poderes locales) ----------
+    async function copyToClipboard(t) { try { await navigator.clipboard.writeText(t || ''); return true; } catch (e) { return false; } }
+    async function doCompose(text) {
+      setMode('thinking'); showAnswer('Redactando…');
+      try {
+        const d = await post('/compose', { request: text });
+        showAnswer(d.text || '(sin respuesta)');
+        const copied = d.ok ? await copyToClipboard(d.text) : false;
+        const m = d.ok ? ('Listo, señor. Lo tiene en pantalla' + (copied ? ' y copiado al portapapeles.' : '.'))
+                       : d.text;
+        speak(m, finishTurn);
+      } catch (err) { showAnswer('No pude redactar: ' + err.message); finishTurn(); }
+    }
+    async function doTranslate(text) {
+      setMode('thinking'); showAnswer('Traduciendo…');
+      try {
+        const d = await post('/translate', { request: text });
+        showAnswer(d.text || '(sin respuesta)');
+        if (d.ok) await copyToClipboard(d.text);
+        speak(d.ok ? d.text : d.text, finishTurn);
+      } catch (err) { showAnswer('No pude traducir: ' + err.message); finishTurn(); }
+    }
+
+    // ---------- Adjuntar un archivo y preguntar sobre él (poder local) ----------
+    const attachBtn = document.getElementById('attach');
+    const fileInput = document.getElementById('fileInput');
+    const fileChip = document.getElementById('fileChip');
+    let attached = null;
+    function showFileChip() {
+      if (attached) { fileChip.textContent = '📎 ' + attached + '  ✕'; fileChip.style.display = 'inline-flex'; attachBtn.classList.add('active'); }
+      else { fileChip.style.display = 'none'; attachBtn.classList.remove('active'); }
+    }
+    async function forgetFile() { attached = null; showFileChip(); try { await post('/forget_file', {}); } catch (e) {} }
+    attachBtn.addEventListener('click', () => { if (attached) forgetFile(); else fileInput.click(); });
+    fileChip.addEventListener('click', forgetFile);
+    fileInput.addEventListener('change', async () => {
+      const f = fileInput.files[0]; if (!f) return;
+      setMode('thinking'); showAnswer('Leyendo «' + f.name + '»…');
+      const b64 = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.readAsDataURL(f); });
+      try {
+        const d = await post('/readfile', { name: f.name, b64 });
+        if (d.ok) { attached = d.name; showFileChip(); }
+        const m = d.message || (d.ok ? 'Listo, señor.' : 'No pude leerlo, señor.');
+        showAnswer(m); speak(m, finishTurn);
+      } catch (err) { showAnswer('No pude leer el archivo: ' + err.message); finishTurn(); }
+      fileInput.value = '';
+    });
+
+    // ---------- Entrada de texto (secundaria) ----------
+    document.getElementById('type').addEventListener('click', () => {
+      form.classList.toggle('show');
+      if (form.classList.contains('show')) input.focus();
+    });
+    form.addEventListener('submit', (e) => { e.preventDefault();
+      const q = input.value.trim(); if (!q) return; input.value = ''; ask(q); });
+  })();
+  </script>
+</body>
+</html>

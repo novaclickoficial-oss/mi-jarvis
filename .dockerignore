@@ -1,0 +1,9 @@
+# Nunca metas secretos ni estado local dentro de la imagen.
+config.json
+reminders.json
+index.json
+deals/
+notes/captures/
+__pycache__/
+*.pyc
+.git
